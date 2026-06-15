@@ -1050,7 +1050,17 @@ const Lockdown = {
 
 /* ---------- boot ---------- */
 Cloud.init();
-App.go('home');
+(function deepLink(){
+  const params=new URLSearchParams(location.search);
+  const code=params.get('code');
+  const hash=(location.hash||'').replace('#','');
+  if(hash==='student' || code){
+    App.go('student');
+    if(code){ const f=$('st-joincode'); if(f && !f.closest('.hidden')) f.value=code;
+      const pf=$('st-pkg'); /* file mode has no code field */ }
+  } else if(hash==='admin'){ App.go('admin'); }
+  else App.go('home');
+})();
 </script>
 </body>
 </html>
