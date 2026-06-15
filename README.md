@@ -88,3 +88,32 @@ read them. In cloud mode the answer key never leaves the server.
 
 > File mode still works whenever `js/config.js` is blank, so you can demo offline and switch to
 > cloud for real cohorts without code changes.
+
+---
+
+## Student guide / landing page
+
+`guide.html` is a friendly, student-facing page (checklist, rules, step-by-step, troubleshooting).
+Send students there instead of the raw app. Its **Join exam** button carries the typed access code
+straight into the app via a deep link: `index.html?code=ACCESS-CODE#student`.
+
+Deep links the app understands:
+- `index.html#student` — open the student join screen
+- `index.html?code=XXXX#student` — open it with the access code prefilled
+- `index.html#admin` — open the instructor console
+
+## Email notifications (optional — not active by default)
+
+`supabase/email-notifications.sql` adds instructor email alerts on submission using Supabase
+`pg_net` + [Resend](https://resend.com) — no server to deploy. Add your Resend API key and recipient
+in the file, run it in the SQL Editor, and you're done. A commented variant emails **only flagged**
+submissions. Remove the trigger to turn it off.
+
+## Custom domain (GitHub Pages)
+
+1. Add a `CNAME` file at the repo root containing just your domain (e.g. `exams.yourschool.edu`).
+2. At your DNS provider, point the domain at GitHub Pages:
+   - Subdomain (e.g. `exams.…`): a **CNAME** record → `niikpakpoe.github.io`
+   - Apex/root (e.g. `yourschool.edu`): four **A** records → `185.199.108.153`, `185.199.109.153`,
+     `185.199.110.153`, `185.199.111.153`
+3. In the repo: **Settings → Pages → Custom domain**, enter the domain, and enable **Enforce HTTPS**.
