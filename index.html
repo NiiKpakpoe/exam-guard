@@ -171,6 +171,8 @@
         <button class="btn primary" style="flex:0" onclick="Admin.signIn()">Sign in</button>
         <button class="btn ghost" style="flex:0" onclick="Admin.signUp()">Create account</button>
       </div>
+      <p id="ca-msg" class="small" style="margin:8px 0 0"></p>
+      <p class="small muted" style="margin:4px 0 0">Password must be at least 6 characters. New here? Click <b>Create account</b> first.</p>
       <div id="cloudAuthIn" class="hidden row" style="align-items:center">
         <span class="pill ok" style="flex:0">☁ Signed in: <b id="ca-who"></b></span>
         <div class="spacer"></div>
@@ -522,10 +524,34 @@ const Admin = {
     $('publishCloudBtn').classList.toggle('hidden', !u);
     if(u){ $('ca-who').textContent=u.email; this.refreshExamList(); }
   },
-  async signIn(){ try{ await Cloud.signIn($('ca-email').value.trim(),$('ca-pass').value);
-      this.cloudUI(); toast('Signed in.'); }catch(e){ toast('⚠ '+e.message); } },
-  async signUp(){ try{ await Cloud.signUp($('ca-email').value.trim(),$('ca-pass').value);
-      toast('Account created — check email if confirmation is on, then sign in.'); }catch(e){ toast('⚠ '+e.message); } },
+  authMsg(text, kind){ const el=$('ca-msg'); if(!el) return;
+    el.innerHTML = text ? `<span class="pill ${kind||''}">${esc(text)}</span>` : ''; },
+  friendlyAuth(m){ m=m||'';
+    if(/already registered|already been registered|user already/i.test(m)) return 'That email already has an account — click Sign in instead.';
+    if(/weak.?password|at least 6/i.test(m)) return 'Password must be at least 6 characters.';
+    if(/invalid login credentials/i.test(m)) return 'Wrong email or password.';
+    if(/email not confirmed/i.test(m)) return 'Email not confirmed — check your inbox.';
+    if(/unable to validate email|invalid format|valid email/i.test(m)) return 'Enter a valid email address.';
+    if(/rate limit|too many/i.test(m)) return 'Too many attempts — wait a minute and try again.';
+    return m; },
+  async signIn(){
+    const email=$('ca-email').value.trim(), pw=$('ca-pass').value;
+    if(!email || !pw){ this.authMsg('Enter your email and password.','bad'); return; }
+    this.authMsg('Signing in…');
+    try{ await Cloud.signIn(email,pw); this.cloudUI(); this.authMsg('Signed in.','ok'); toast('Signed in.'); }
+    catch(e){ this.authMsg(this.friendlyAuth(e.message),'bad'); }
+  },
+  async signUp(){
+    const email=$('ca-email').value.trim(), pw=$('ca-pass').value;
+    if(!email){ this.authMsg('Enter an email address.','bad'); return; }
+    if(pw.length<6){ this.authMsg('Password must be at least 6 characters.','bad'); return; }
+    this.authMsg('Creating account…');
+    try{
+      await Cloud.signUp(email,pw);
+      try{ await Cloud.signIn(email,pw); this.cloudUI(); this.authMsg('Account created — you are signed in.','ok'); toast('Account created.'); }
+      catch{ this.authMsg('Account created. Now click Sign in.','ok'); }
+    }catch(e){ this.authMsg(this.friendlyAuth(e.message),'bad'); }
+  },
   async signOut(){ await Cloud.signOut(); this.cloudUI(); toast('Signed out.'); },
   async publishCloud(){
     if(!Cloud.user()){ toast('⚠ Sign in first.'); return; }
