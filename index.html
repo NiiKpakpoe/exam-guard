@@ -224,7 +224,46 @@
           <option value="short">Short answer (auto-checked)</option>
         </select>
         <button class="btn primary sm" style="flex:0" onclick="Admin.addQuestion()">＋ Add question</button>
+        <button class="btn sm" style="flex:0" onclick="document.getElementById('bulkPanel').classList.toggle('hidden')">⬆ Bulk import</button>
       </div>
+
+      <div id="bulkPanel" class="hidden" style="margin-top:12px;border:1px dashed var(--line);border-radius:12px;padding:14px;background:var(--panel2)">
+        <p class="small muted" style="margin-top:0">Paste your questions below — one blank line between questions, and an
+          <span class="kbd">ANSWER:</span> line for each. Options are lettered <span class="kbd">A.</span> <span class="kbd">B.</span> …</p>
+        <textarea id="bulkText" style="min-height:150px;font-family:ui-monospace,Menlo,monospace;font-size:13px"
+          placeholder="What is the capital of France?&#10;A. London&#10;B. Paris&#10;C. Accra&#10;ANSWER: B"></textarea>
+        <div class="row" style="margin-top:10px">
+          <button class="btn" style="flex:0" onclick="Admin.bulkLoadFile()">📄 Load .txt file</button>
+          <button class="btn ghost" style="flex:0" onclick="Admin.bulkSample()">Insert example</button>
+          <button class="btn ghost danger" style="flex:0" onclick="document.getElementById('bulkText').value=''">Clear</button>
+          <button class="btn primary" style="flex:0" onclick="Admin.bulkImport()">Import into pool →</button>
+        </div>
+        <p class="small" id="bulkMsg" style="margin-bottom:0"></p>
+        <details style="margin-top:8px"><summary class="small muted">Format guide (all 4 question types)</summary>
+<code class="block">Single choice — mark one letter:
+  Which curve relates price and quantity demanded?
+  A. Supply curve
+  B. Demand curve
+  ANSWER: B
+
+Multiple answers — list the letters:
+  Select the prime numbers.
+  A. 2
+  B. 4
+  C. 5
+  D. 9
+  ANSWER: A, C
+
+True / False — no options needed:
+  Water boils at 100°C at sea level.
+  ANSWER: True
+
+Short answer — accept alternatives with | :
+  The chemical symbol for gold is ____.
+  ANSWER: Au | gold</code>
+        </details>
+      </div>
+
       <div id="qlist"></div>
     </div>
 
@@ -549,6 +588,66 @@ const Admin = {
     this.renderQuestions();
     // focus the new question text
     setTimeout(()=>{ const el=document.querySelector(`[data-q="${base.id}"] .qtext`); if(el) el.focus(); },50);
+  },
+
+  /* ---- bulk import (Aiken-style text) ---- */
+  parseBulk(text){
+    const blocks=text.replace(/\r/g,'').split(/\n\s*\n+/).map(b=>b.trim()).filter(Boolean);
+    const out=[], warn=[];
+    const optRe=/^([A-Za-z])[.)]\s*(.+)$/;
+    blocks.forEach((block,bi)=>{
+      const lines=block.split('\n').map(l=>l.trim()).filter(Boolean);
+      const ai=lines.findIndex(l=>/^(answer|ans|correct)\s*[:\-]/i.test(l));
+      if(ai===-1){ warn.push(`Q${bi+1}: no ANSWER line`); return; }
+      const ansRaw=lines[ai].replace(/^(answer|ans|correct)\s*[:\-]\s*/i,'').trim();
+      const opts=[], qLines=[];
+      lines.slice(0,ai).forEach(l=>{ const m=l.match(optRe); if(m) opts.push({L:m[1].toUpperCase(),t:m[2].trim()}); else qLines.push(l); });
+      const qtext=qLines.join(' ').trim();
+      if(!qtext){ warn.push(`Q${bi+1}: no question text`); return; }
+      if(opts.length){
+        const letters=ansRaw.toUpperCase().split(/[,\s]+/).filter(Boolean);
+        const correct=[]; letters.forEach(L=>{ const i=opts.findIndex(o=>o.L===L); if(i>=0) correct.push(i); });
+        if(!correct.length){ warn.push(`Q${bi+1}: ANSWER "${ansRaw}" matches no option`); return; }
+        const isTF=opts.length===2 && opts.every(o=>/^(true|false)$/i.test(o.t));
+        out.push({ id:uid(), type:isTF?'tf':(correct.length>1?'multi':'single'), text:qtext,
+          options:opts.map(o=>o.t), correct });
+      } else if(/^(true|false)$/i.test(ansRaw)){
+        out.push({ id:uid(), type:'tf', text:qtext, options:['True','False'], correct:[/^true$/i.test(ansRaw)?0:1] });
+      } else {
+        const answers=ansRaw.split(/\s*[|;]\s*/).map(s=>s.trim()).filter(Boolean);
+        out.push({ id:uid(), type:'short', text:qtext, answers });
+      }
+    });
+    return { out, warn };
+  },
+  bulkImport(){
+    const { out, warn }=this.parseBulk($('bulkText').value);
+    if(!out.length){ $('bulkMsg').innerHTML='<span class="pill bad">No questions parsed.</span> '+esc(warn.join('; ')); return; }
+    this.exam.questions.push(...out); this.renderQuestions();
+    $('bulkMsg').innerHTML=`<span class="pill ok">Imported ${out.length}</span>`+
+      (warn.length?` <span class="pill warn">${warn.length} skipped</span> <span class="muted">${esc(warn.join('; '))}</span>`:'');
+    toast(`Imported ${out.length} question(s).`);
+  },
+  bulkLoadFile(){ pickFile((txt)=>{ $('bulkText').value=txt; toast('File loaded — review then Import.'); }, '.txt,text/plain'); },
+  bulkSample(){ $('bulkText').value=
+`Which curve relates price and quantity demanded?
+A. Supply curve
+B. Demand curve
+C. Phillips curve
+ANSWER: B
+
+Select the prime numbers.
+A. 2
+B. 4
+C. 5
+D. 9
+ANSWER: A, C
+
+Water boils at 100°C at sea level.
+ANSWER: True
+
+The chemical symbol for gold is ____.
+ANSWER: Au | gold`;
   },
 
   renderQuestions(){
