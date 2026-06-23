@@ -109,6 +109,47 @@ $$;
 grant execute on function public.eg_fetch_exam(text) to anon, authenticated;
 
 -- ===========================================================================
+--  FUNCTION 1b — fetch results for an exam WITHOUT the heavy payload.
+--  The instructor results table only needs scalars + the violation log + a
+--  "was a webcam photo captured" flag. The base64 webcam photo (and the raw
+--  answers) live in data.* and are NOT rendered anywhere, yet a plain
+--  select('*') shipped them for every student on every view — the main egress
+--  cost. This strips them server-side; load the full row on demand if ever
+--  needed to actually display a photo.
+-- ===========================================================================
+create or replace function public.eg_fetch_results(p_exam_id text)
+returns table (
+  id            uuid,
+  student_id    text,
+  name          text,
+  score         int,
+  total         int,
+  percent       int,
+  passed        boolean,
+  violations    int,
+  submitted_at  timestamptz,
+  elapsed_ms    bigint,
+  violation_log jsonb,
+  has_webcam    boolean
+)
+language sql
+security definer
+set search_path = public
+as $$
+  select
+    r.id, r.student_id, r.name, r.score, r.total, r.percent, r.passed,
+    r.violations, r.submitted_at,
+    coalesce((r.data ->> 'elapsedMs')::bigint, 0)              as elapsed_ms,
+    coalesce(r.data -> 'violations', '[]'::jsonb)              as violation_log,
+    (r.data ? 'webcam' and nullif(r.data ->> 'webcam','') is not null) as has_webcam
+  from public.eg_results r
+  where r.exam_id = p_exam_id
+  order by r.submitted_at desc;
+$$;
+-- authenticated only (matches the eg_results read policy); students cannot call it
+grant execute on function public.eg_fetch_results(text) to authenticated;
+
+-- ===========================================================================
 --  FUNCTION 2 — submit an attempt; grades server-side, enforces single attempt
 -- ===========================================================================
 create or replace function public.eg_submit_attempt(

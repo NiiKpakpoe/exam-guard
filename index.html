@@ -492,8 +492,7 @@ const Cloud = (() => {
     async listExams(){ const {data,error}=await client.from('eg_exams')
         .select('id,title,access_code,active,updated_at').order('updated_at',{ascending:false});
       if(error) throw error; return data||[]; },
-    async fetchResults(examId){ const {data,error}=await client.from('eg_results')
-        .select('*').eq('exam_id',examId).order('submitted_at',{ascending:false});
+    async fetchResults(examId){ const {data,error}=await client.rpc('eg_fetch_results',{p_exam_id:examId});
       if(error) throw error; return data||[]; },
 
     /* student */
@@ -576,8 +575,8 @@ const Admin = {
       this.results=rows.map(r=>({
         name:r.name, studentId:r.student_id, _correct:r.score, _total:r.total, _pct:r.percent,
         _pass:r.passed, _valid:true, violationCount:r.violations,
-        elapsedMs:(r.data&&r.data.elapsedMs)||0, submittedAt:r.submitted_at,
-        violations:(r.data&&r.data.violations)||[], webcam:(r.data&&r.data.webcam)||null
+        elapsedMs:r.elapsed_ms||0, submittedAt:r.submitted_at,
+        violations:r.violation_log||[], webcam:!!r.has_webcam
       }));
       $('gradeExamInfo').textContent=`Loaded ${rows.length} cloud result(s) for ${examId}.`;
       this.renderResults();
@@ -883,7 +882,17 @@ const Student = {
     const code=$('st-joincode').value.trim(); if(!code){ toast('⚠ Enter the access code.'); return; }
     $('st-joinmsg').textContent='Looking up exam…';
     try{
-      const ex=await Cloud.fetchExam(code);
+      // Cache the sanitized exam per tab so a reload reuses it instead of
+      // re-downloading the whole payload (the guide warns "don't refresh
+      // repeatedly" precisely because each reload re-fetched). The cached copy
+      // has no answer keys (stripped server-side) and clears when the tab closes.
+      const cacheKey='eg_exam_'+code.toLowerCase();
+      let ex=null;
+      try{ const c=sessionStorage.getItem(cacheKey); if(c) ex=JSON.parse(c); }catch{}
+      if(!ex){
+        ex=await Cloud.fetchExam(code);
+        if(ex){ try{ sessionStorage.setItem(cacheKey,JSON.stringify(ex)); }catch{} }
+      }
       if(!ex){ $('st-joinmsg').innerHTML='<span class="pill bad">No active exam found for that code.</span>'; return; }
       this.cloud=true; this.accessCode=code; this.exam=ex;
       $('st-joinmsg').textContent='';
