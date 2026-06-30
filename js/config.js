@@ -16,8 +16,15 @@
                        answer keys and results. NEVER put the service_role key here.
 
    Run supabase/schema.sql in the Supabase SQL editor once before using cloud mode.
+   -------------------------------------------------------------------------
+   SHELVED 2026-06-30: decoupled from the shared Supabase project
+   (fpwbvtoqabaiisqugqwi, used by sentinel-ra). Both values are blank, so the
+   app runs in LOCAL FILE mode and connects to NO backend. To bring ExamGuard
+   back online, follow supabase/MIGRATION-RUNBOOK.md and SHELVED.md, then fill
+   in the NEW project's URL + anon key below. Do NOT reuse the old shared
+   project — give ExamGuard its own.
    ========================================================================= */
 window.EG_CONFIG = {
-  supabaseUrl: 'https://fpwbvtoqabaiisqugqwi.supabase.co',
-  supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwd2J2dG9xYWJhaWlzcXVncXdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MjYwMjMsImV4cCI6MjA5NzEwMjAyM30.RZtSmuOGNcaNVXojPuinE35sVdugDKYKoveKtziL5kg'
+  supabaseUrl: '',
+  supabaseAnonKey: ''
 };
