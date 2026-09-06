@@ -106,6 +106,12 @@ begin
   return pub;
 end;
 $$;
+-- NOTE: PostgreSQL grants EXECUTE on a new function to PUBLIC by default, and
+-- PUBLIC includes `anon`. The grant below is therefore NOT what limits access —
+-- the revoke above is. Omitting it is how eg_fetch_results ended up callable by
+-- anonymous clients on the shared project despite being granted only to
+-- `authenticated`. Always revoke from public before granting.
+revoke all on function public.eg_fetch_exam(text) from public;
 grant execute on function public.eg_fetch_exam(text) to anon, authenticated;
 
 -- ===========================================================================
@@ -147,6 +153,7 @@ as $$
   order by r.submitted_at desc;
 $$;
 -- authenticated only (matches the eg_results read policy); students cannot call it
+revoke all on function public.eg_fetch_results(text) from public, anon;
 grant execute on function public.eg_fetch_results(text) to authenticated;
 
 -- ===========================================================================
@@ -237,4 +244,5 @@ begin
   );
 end;
 $$;
+revoke all on function public.eg_submit_attempt(text, text, text, jsonb, jsonb) from public;
 grant execute on function public.eg_submit_attempt(text, text, text, jsonb, jsonb) to anon, authenticated;

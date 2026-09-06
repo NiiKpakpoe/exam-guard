@@ -1,5 +1,20 @@
 # ExamGuard — SHELVED (not in use)
 
+> **⚠️ OPEN SECURITY ITEM — verified live 2026-09-06.**
+> Step 3 below ("Drop ExamGuard's objects from the shared project") was **never
+> run**. All three `eg_*` RPCs are still present on `fpwbvtoqabaiisqugqwi` and
+> still execute for role `anon`, including `eg_submit_attempt` (an
+> unauthenticated INSERT path) and `eg_fetch_results` (SECURITY DEFINER, so it
+> bypasses RLS — it was meant to be `authenticated`-only but PostgreSQL's
+> default `EXECUTE to PUBLIC` was never revoked).
+>
+> ExamGuard's `anon` key is in this repo's **public** git history (commits
+> `4a680df`, `eacf4ad`) and stays valid until 2036. `eg_exams` / `eg_results`
+> are empty, so nothing is leaking today — but the write path is open.
+>
+> **Fix:** run `supabase/0002_decommission.sql`. Rewriting git history will not
+> help; the key is already published. It has to be revoked, not hidden.
+
 **Status as of 2026-06-30:** disconnected from the shared Supabase project
 `fpwbvtoqabaiisqugqwi` (which also serves sentinel-ra). Not in active use. The
 code is kept intact in this folder so it can be redeployed later on its own
@@ -47,21 +62,16 @@ pg_dump "$OLD_DB" --data-only --no-owner --no-privileges \
 Keep `examguard-data-backup-*.sql` in this folder. (Skip if there's no exam
 data worth keeping.)
 
-### 3. Drop ExamGuard's objects from the shared project
-Removes the footprint entirely. sentinel-ra uses *different* tables, so this is
-safe for it. Run on the **shared (OLD)** project only:
-```sql
-drop trigger if exists eg_results_notify on public.eg_results;
-drop function if exists public.eg_notify_result();
-drop function if exists public.eg_fetch_results(text);
-drop function if exists public.eg_fetch_exam(text);
-drop function if exists public.eg_submit_attempt(text, text, text, jsonb, jsonb);
-drop table if exists public.eg_results;
-drop table if exists public.eg_exams;
-drop table if exists public.eg_secrets;
--- leave eg_touch() if any sentinel-ra trigger uses it; otherwise:
--- drop function if exists public.eg_touch();
-```
+### 3. Drop ExamGuard's objects from the shared project  ← **STILL OUTSTANDING**
+Removes the footprint entirely, and with it the anonymous read/write surface
+described in the banner above. Sentinel-RA, the monitoring hub (`mc_*`) and
+Planwright (`pw_*`) use different tables and were verified on 2026-09-06 to
+reference no `eg_*` object, so this is safe for them.
+
+Run `supabase/0002_decommission.sql` in the Supabase SQL Editor. It supersedes
+the hand-written drop list that used to sit here: it is idempotent, drops
+functions by their real catalog signatures (so it survives the rewrite in
+`9b03dff`), avoids CASCADE on functions, and ends with a verification query.
 
 ## How to bring ExamGuard back later
 The structure is fully reproducible from this folder — no rewrite needed:
