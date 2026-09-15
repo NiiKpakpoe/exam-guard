@@ -1,19 +1,18 @@
 # ExamGuard — SHELVED (not in use)
 
-> **⚠️ OPEN SECURITY ITEM — verified live 2026-09-06.**
-> Step 3 below ("Drop ExamGuard's objects from the shared project") was **never
-> run**. All three `eg_*` RPCs are still present on `fpwbvtoqabaiisqugqwi` and
-> still execute for role `anon`, including `eg_submit_attempt` (an
-> unauthenticated INSERT path) and `eg_fetch_results` (SECURITY DEFINER, so it
-> bypasses RLS — it was meant to be `authenticated`-only but PostgreSQL's
-> default `EXECUTE to PUBLIC` was never revoked).
+> **✅ RESOLVED 2026-09-15 — `supabase/0002_decommission.sql` was run on `fpwbvtoqabaiisqugqwi`.**
+> Step 3 below had never been run after the 2026-06-30 shelve, so the `eg_*`
+> tables and RPCs stayed live on the shared project for months (verified
+> 2026-09-06 and 2026-09-10; `eg_exams` / `eg_results` were empty throughout, so
+> no student data was exposed). The decommission dropped every `eg_*` table,
+> trigger and function; the catalog check returned zero leftovers and the REST
+> probes now answer 404 for `eg_exams`, `eg_results`, `eg_fetch_exam` and
+> `eg_fetch_results`.
 >
-> ExamGuard's `anon` key is in this repo's **public** git history (commits
-> `4a680df`, `eacf4ad`) and stays valid until 2036. `eg_exams` / `eg_results`
-> are empty, so nothing is leaking today — but the write path is open.
->
-> **Fix:** run `supabase/0002_decommission.sql`. Rewriting git history will not
-> help; the key is already published. It has to be revoked, not hidden.
+> The project's legacy `anon` JWT is still in this repo's **public** git history
+> (commits `4a680df`, `eacf4ad`) and stays valid until 2036 — there is simply
+> nothing ExamGuard-shaped left for it to reach. Revoking it is the legacy-key
+> cutover in sentinel-ra's `SECRET-KEY-MIGRATION.md` (four live consumers).
 
 **Status as of 2026-06-30:** disconnected from the shared Supabase project
 `fpwbvtoqabaiisqugqwi` (which also serves sentinel-ra). Not in active use. The
